@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+
+### Program: paiof
+### Author: Rauf Salamzade
+### Kalan Lab
+### UW Madison, Department of Medical Microbiology and Immunology
+
+# BSD 3-Clause License
+#
+# Copyright (c) 2023, Rauf Salamzade
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import os
+import sys
+from paiof import util
+from time import sleep
+import argparse
+import pkg_resources
+import multiprocessing
+
+version = pkg_resources.require("paiof")[0].version
+
+def create_parser():
+	""" Parse arguments """
+	parser = argparse.ArgumentParser(description="""
+	Program: paiof
+	Author: Rauf Salamzade
+	Affiliation: Kalan Lab, UW Madison, Department of Medical Microbiology and Immunology
+
+	paiof: Pairwise Average Amino-Acid Identity using OrthoFinder Results. 
+	""", formatter_class=argparse.RawTextHelpFormatter)
+
+	parser.add_argument('-i', '--orthofinder_results_dir', nargs='+', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
+	parser.add_argument('-o', '--output_directory', help='Output directory.', required=True)
+	parser.add_argument('-c', '--cpus', type=int, help="Number of CPUs to use.", required=False, default=1)
+	parser.add_argument('-v', '--version', action='store_true', help="Report version of skDER.", required=False, default=False)
+	args = parser.parse_args()
+	return args
+
+def paiof():
+	if len(sys.argv)>1 and ('-v' in set(sys.argv) or '--version' in set(sys.argv)):
+		sys.stderr.write('Version of paiof being used is: ' + str(version) + '\n')
+		sys.exit(0)
+	
+	# Parse arguments
+	myargs = create_parser()
+
+	ofdir = myargs.orthofinder_results_dir
+	outdir = os.path.abspath(myargs.output_directory) + '/'
+	cpus = myargs.cpus
+    
+	of_og_seqs_dir = None
+	species_id_file = None
+	sequence_id_file = None
+	try:
+		assert(os.path.isdir(ofdir))
+		ofdir = os.path.abspath(ofdir) + '/'
+		of_og_seqs_dir = ofdir + 'Orthogroup_Sequences/'
+		species_id_file = ofdir + 'SpeciesIDs.txt'
+		sequence_id_file = ofdir + 'SequenceIDs.txt'
+		assert(os.path.isfile(species_id_file) and os.path.isfile(sequence_id_file) and os.path.isdir(of_og_seqs_dir))
+	except:
+		sys.stderr.write("ERROR: Either the OrthoFinder results directory doesn't exist or the\nOrthogroup_Sequences/, WorkingDirectory/SpeciesIDs.txt, or WorkingDirectory/SequenceIDs.txt\nsub-directories or sub-files do not exist...\n")
+		sys.exit(1)
+
+	if os.path.isdir(outdir):
+		sys.stderr.write("Output directory already exists! Overwriting in 5 seconds, but only where needed will use checkpoint files to skip certain steps...\n")
+		sleep(5)
+	else:
+		util.setupDirectories([outdir])
+
+	# Create logging object
+	log_file = outdir + 'Progress.log'
+	logObject = util.createLoggerObject(log_file)
+	parameters_file = outdir + 'Command_Issued.txt'
+	sys.stdout.write('Running version %s\n' % version)
+	sys.stdout.write("Appending command issued for future records to: %s\n" % parameters_file)
+	sys.stdout.write("Logging more details at: %s\n" % log_file)
+	logObject.info("\nNEW RUN!!!\n**************************************")
+	logObject.info('Running version %s' % version)
+	logObject.info("Appending command issued for future records to: %s" % parameters_file)
+
+	parameters_handle = open(parameters_file, 'a+')
+	parameters_handle.write(' '.join(sys.argv) + '\n')
+	parameters_handle.close()
+
+	check_dir = outdir + 'Checkpoints/'
+	if not os.path.isdir(check_dir):
+		util.setupDirectories([check_dir])
+
+	# step 1: create DIAMOND databases for each ortholog group.
+	check_file_step1 = check_dir + 'step1.txt'
+	diamond_db_dir = outdir + 'DIAMOND_OG_DBs/'
+	if not os.path.isfile(check_file_step1):
+		util.setupDirectories([diamond_db_dir])
+		util.setupDIAMONDdbs(of_og_seqs_dir, diamond_db_dir, logObject, cpus)
+		os.system('touch %s' % check_file_step1)
+
+	# step 2: run DIAMOND self-blastp for each ortholog group.
+	check_file_step2 = check_dir + 'step2.txt'
+	blast_results_dir = outdir + 'Self_BLASTp_DIAMOND_Results/'
+	if not os.path.isfile(check_file_step2):
+		util.setupDirectories([blast_results_dir])
+		util.blastOGs(of_og_seqs_dir, diamond_db_dir, blast_results_dir, logObject, cpus)
+		os.system('touch %s' % check_file_step2)
+
+	# step 3: process and compute AAI and Shared Orthologs
+	check_file_step3 = check_dir + 'step3.txt'
+	final_result_tsv = outdir + 'Pairwise_AAI_Estimates.tsv'
+	if not os.path.isfile(check_file_step3):
+		util.calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_result_tsv, logObject)
+		os.system('touch %s' % check_file_step3)
+
+	# close logging object and exit
+	logObject.info('******************\npaiof finished!\n******************\nFinal results file can be found at: %s' % final_result_tsv)
+	sys.stdout.write('******************\npaiof finished!\n******************\nFinal results file can be found at: %s\n' % final_result_tsv)
+	util.closeLoggerObject(logObject)
+	sys.exit(0)
+
+if __name__ == '__main__':
+	multiprocessing.set_start_method('fork')
+	paiof()
+	
