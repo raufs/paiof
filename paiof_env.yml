@@ -8,4 +8,7 @@ dependencies:
   - setuptools
   - pip
   - bioconda::diamond=2.0.15
-  - bioconda::fastme
+  - conda-forge::scikit-bio
+  - scikit-learn
+  - scipy
+  - plotly

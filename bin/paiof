@@ -56,11 +56,14 @@ def create_parser():
 	Affiliation: Kalan Lab, UW Madison, Department of Medical Microbiology and Immunology
 
 	paiof: Pairwise Average Amino-Acid Identity using OrthoFinder Results. 
+								  
+	Note, currently, the coarse orthogroups are used, not phylogenetic/hierarchical orthogroups.
 	""", formatter_class=argparse.RawTextHelpFormatter)
 
-	parser.add_argument('-i', '--orthofinder_results_dir', nargs='+', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
+	parser.add_argument('-i', '--orthofinder_results_dir', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
 	parser.add_argument('-o', '--output_directory', help='Output directory.', required=True)
-	parser.add_argument('-c', '--cpus', type=int, help="Number of CPUs to use.", required=False, default=1)
+	parser.add_argument('-c', '--cpus', type=int, help="Number of CPUs to use [Default is 1].", required=False, default=1)
+	parser.add_argument('-scc', '--single_copy_core', action='store_true', help="Only use single-copy-core orthogroups.", required=False, default=False)
 	parser.add_argument('-v', '--version', action='store_true', help="Report version of skDER.", required=False, default=False)
 	args = parser.parse_args()
 	return args
@@ -76,17 +79,21 @@ def paiof():
 	ofdir = myargs.orthofinder_results_dir
 	outdir = os.path.abspath(myargs.output_directory) + '/'
 	cpus = myargs.cpus
-    
+	use_scc_flag = myargs.single_copy_core
 	of_og_seqs_dir = None
 	species_id_file = None
 	sequence_id_file = None
+	og_file = None
+	scc_og_file = None
 	try:
 		assert(os.path.isdir(ofdir))
 		ofdir = os.path.abspath(ofdir) + '/'
 		of_og_seqs_dir = ofdir + 'Orthogroup_Sequences/'
-		species_id_file = ofdir + 'SpeciesIDs.txt'
-		sequence_id_file = ofdir + 'SequenceIDs.txt'
-		assert(os.path.isfile(species_id_file) and os.path.isfile(sequence_id_file) and os.path.isdir(of_og_seqs_dir))
+		species_id_file = ofdir + 'WorkingDirectory/SpeciesIDs.txt'
+		sequence_id_file = ofdir + 'WorkingDirectory/SequenceIDs.txt'
+		og_file = ofdir + 'Orthogroups/Orthogroups.tsv'
+		scc_og_file = ofdir + 'Orthogroups/Orthogroups_SingleCopyOrthologues.txt'
+		assert(os.path.isfile(species_id_file) and os.path.isfile(sequence_id_file) and os.path.isfile(og_file) and os.path.isfile(scc_og_file) and os.path.isdir(of_og_seqs_dir))
 	except:
 		sys.stderr.write("ERROR: Either the OrthoFinder results directory doesn't exist or the\nOrthogroup_Sequences/, WorkingDirectory/SpeciesIDs.txt, or WorkingDirectory/SequenceIDs.txt\nsub-directories or sub-files do not exist...\n")
 		sys.exit(1)
@@ -116,12 +123,27 @@ def paiof():
 	if not os.path.isdir(check_dir):
 		util.setupDirectories([check_dir])
 
+	# step 0: determine non-singleton ortholog group ids.
+	ogs_to_consider = set([])
+	if use_scc_flag:
+		with open(scc_og_file) as osof:
+			for i, line in enumerate(osof):
+				if i == 0: continue
+				og = line.split('\t')[0]
+				ogs_to_consider.add(og)
+	else:
+		with open(og_file) as oof:
+			for i, line in enumerate(oof):
+				if i == 0: continue
+				og = line.split('\t')[0]
+				ogs_to_consider.add(og)
+
 	# step 1: create DIAMOND databases for each ortholog group.
 	check_file_step1 = check_dir + 'step1.txt'
 	diamond_db_dir = outdir + 'DIAMOND_OG_DBs/'
 	if not os.path.isfile(check_file_step1):
 		util.setupDirectories([diamond_db_dir])
-		util.setupDIAMONDdbs(of_og_seqs_dir, diamond_db_dir, logObject, cpus)
+		util.setupDIAMONDdbs(of_og_seqs_dir, diamond_db_dir, ogs_to_consider, logObject, cpus)
 		os.system('touch %s' % check_file_step1)
 
 	# step 2: run DIAMOND self-blastp for each ortholog group.
@@ -129,7 +151,7 @@ def paiof():
 	blast_results_dir = outdir + 'Self_BLASTp_DIAMOND_Results/'
 	if not os.path.isfile(check_file_step2):
 		util.setupDirectories([blast_results_dir])
-		util.blastOGs(of_og_seqs_dir, diamond_db_dir, blast_results_dir, logObject, cpus)
+		util.blastOGs(of_og_seqs_dir, diamond_db_dir, blast_results_dir, ogs_to_consider, logObject, cpus)
 		os.system('touch %s' % check_file_step2)
 
 	# step 3: process and compute AAI and Shared Orthologs
@@ -148,4 +170,3 @@ def paiof():
 if __name__ == '__main__':
 	multiprocessing.set_start_method('fork')
 	paiof()
-	

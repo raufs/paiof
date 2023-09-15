@@ -41,16 +41,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
 import sys
 from paiof import util
-import shutil
 from time import sleep
 import argparse
-import gzip
-import traceback
-import logging
-import subprocess
 import pkg_resources
-from Bio import SeqIO
-import multiprocessing
 
 version = pkg_resources.require("paiof")[0].version
 
@@ -61,12 +54,12 @@ def create_parser():
 	Author: Rauf Salamzade
 	Affiliation: Kalan Lab, UW Madison, Department of Medical Microbiology and Immunology
 
-	hamtree: Hamming-distance based assessment of sample similarity using neighbor-joining to construct a tree.
+
 	""", formatter_class=argparse.RawTextHelpFormatter)
 
-	parser.add_argument('-i', '--orthofinder_results_dir', nargs='+', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
+	parser.add_argument('-i', '--orthofinder_results_dir', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
 	parser.add_argument('-o', '--output_directory', help='Output directory.', required=True)
-	parser.add_argument('-c', '--cpus', type=int, help="Number of CPUs to use.", required=False, default=1)
+	parser.add_argument('-p', '--perform_pca', action='store_true', help="Also perform PCA analysis based on orthogroup presence/absence.")
 	parser.add_argument('-v', '--version', action='store_true', help="Report version of skDER.", required=False, default=False)
 	args = parser.parse_args()
 	return args
@@ -81,23 +74,20 @@ def hamtree():
 
 	ofdir = myargs.orthofinder_results_dir
 	outdir = os.path.abspath(myargs.output_directory) + '/'
-	cpus = myargs.cpus
-    
-	of_og_seqs_dir = None
-	species_id_file = None
-	sequence_id_file = None
+	perform_pca_flag = myargs.perform_pca
+
+	og_file = None
 	try:
 		assert(os.path.isdir(ofdir))
 		ofdir = os.path.abspath(ofdir) + '/'
-		of_og_seqs_dir = ofdir + 'Orthogroup_Sequences/'
-		species_id_file = ofdir + 'SpeciesIDs.txt'
-		sequence_id_file = ofdir + 'SequenceIDs.txt'
+		og_file = ofdir + 'Orthogroups/Orthogroups.tsv'
+		assert(os.path.isfile(og_file))
 	except:
-		sys.stderr.write("ERROR: Either the OrthoFinder results directory doesn't exist or the\nOrthogroup_Sequences/, WorkingDirectory/SpeciesIDs.txt, or WorkingDirectory/SequenceIDs.txt\nsub-directories or sub-files do not exist...\n")
+		sys.stderr.write("ERROR: Either the OrthoFinder results directory doesn't exist or the\nOrthogroups/Orthogroups.tsv or sub-file does not exist...\n")
 		sys.exit(1)
 
 	if os.path.isdir(outdir):
-		sys.stderr.write("Output directory already exists! Overwriting in 5 seconds, but only where needed will use checkpoint files to skip certain steps...\n")
+		sys.stderr.write("Output directory already exists! Overwriting in 5 seconds...\n")
 		sleep(5)
 	else:
 		util.setupDirectories([outdir])
@@ -117,23 +107,22 @@ def hamtree():
 	parameters_handle.write(' '.join(sys.argv) + '\n')
 	parameters_handle.close()
 
-	check_dir = outdir + 'Checkpoints/'
-	if not os.path.isdir(check_dir):
-		util.setupDirectories([check_dir])
+	# step 0: create Hamming distance based on orthogroup presence/absence
+	hd_mat, og_mat, samples, ogs = util.processOrthogroupsTsvForHammingDistance(og_file, logObject)
+	
+	# step 1: use scikit-bio's nj function to create a 
+	hamtree_result_newick = outdir + 'HamTree.newick'
+	util.createNJTree(hamtree_result_newick, hd_mat, samples, logObject)
 
-	# step 1: create DIAMOND databases for each ortholog group.
-	check_file_step1 = check_dir _+ 
-
-	util.setupDIAM
-
-	# step 2: run DIAMOND self-blastp for each ortholog group.
+	# step 2: run PCA analysis if requested
+	if perform_pca_flag:
+		util.performPCA(outdir, og_mat, samples, ogs, logObject)
 
 	# close logging object and exit
-	logObject.info('******************\nskDER finished!\n******************\nDirectory with dereplicated genomes can be found at: %s' % skani_drep_dir)
-	sys.stdout.write('******************\nskDER finished!\n******************\nDirectory with dereplicated genomes can be found at: %s\n' % skani_drep_dir)
+	logObject.info('******************\nhamtree finished!\n******************')
+	sys.stdout.write('******************\nhamtree finished!\n******************\n')
 	util.closeLoggerObject(logObject)
 	sys.exit(0)
 
 if __name__ == '__main__':
-	multiprocessing.set_start_method('fork')
 	hamtree()

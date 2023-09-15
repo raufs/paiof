@@ -7,6 +7,12 @@ import multiprocessing
 from collections import defaultdict
 from operator import itemgetter
 import statistics
+import pandas as pd
+from skbio import DistanceMatrix
+from skbio.tree import nj
+from scipy.spatial import distance
+from sklearn.decomposition import PCA
+import plotly.express as px
 
 def createLoggerObject(log_file):
 	"""
@@ -78,8 +84,9 @@ def multiProcess(inputs):
 						executable='/bin/bash')
 	except Exception as e:
 		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
 
-def setupDIAMONDdbs(og_seq_dir, diamond_db_dir, logObject, cpus):
+def setupDIAMONDdbs(og_seq_dir, diamond_db_dir, ogs_to_consider, logObject, cpus):
 	"""
 	Function to setup individual DIAMOND dbs for self-blast later on.
 	"""
@@ -87,9 +94,11 @@ def setupDIAMONDdbs(og_seq_dir, diamond_db_dir, logObject, cpus):
 		build_db_cmds = []
 		for f in os.listdir(og_seq_dir):
 			if f.endswith('.fa'): 
+				og = '.fa'.join(f.endswith('.fa')[:-1])
+				if not og in ogs_to_consider: continue
 				og_seq = og_seq_dir + f
 				diamond_db = diamond_db_dir + f + '.dmnd'
-				diamond_db_cmd = ['diamond', 'makdedb', '--ignore-warnings', '--in', og_seq, '-d', diamond_db]
+				diamond_db_cmd = ['diamond', 'makedb', '--ignore-warnings', '--in', og_seq, '-d', diamond_db]
 				build_db_cmds.append(diamond_db_cmd)
 		p = multiprocessing.Pool(cpus)
 		p.map(multiProcess, build_db_cmds)
@@ -98,8 +107,9 @@ def setupDIAMONDdbs(og_seq_dir, diamond_db_dir, logObject, cpus):
 		sys.stderr.write('Problem with setting up DIAMOND dbs for orthogroups.\n')
 		logObject.error('Problem with setting up DIAMOND dbs for orthogroups.')
 		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
 
-def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, logObject, cpus, evalue_cutoff=1e-3):
+def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, ogs_to_consider, logObject, cpus, evalue_cutoff=1e-3):
 	"""
 	Function to run self-blast.
 	"""
@@ -107,9 +117,11 @@ def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, logObject, cpus, eva
 		blastp_cmds = []
 		for f in os.listdir(og_seq_dir):
 			if f.endswith('.fa'): 
+				og = '.fa'.join(f.endswith('.fa')[:-1])
+				if not og in ogs_to_consider: continue
 				og_seq = og_seq_dir + f
 				diamond_db = diamond_db_dir + f + '.dmnd'
-				results_file = blast_results_dir + f.split('.txt')
+				results_file = blast_results_dir + f + '.txt'
 				assert (os.path.isfile(diamond_db) and os.path.isfile(og_seq))
 				blastp_cmd = ['diamond', 'blastp', '--ignore-warnings', '--threads', '1', '--very-sensitive',
 							  '--query', og_seq, '--db', diamond_db, '--outfmt', '6', 'qseqid', 'sseqid',
@@ -122,6 +134,7 @@ def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, logObject, cpus, eva
 		sys.stderr.write('Problem with performing self-BLASTp.\n')
 		logObject.error('Problem with performing self-BLASTp.')
 		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
 
 def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_results_tsv, logObject):
 	"""
@@ -190,8 +203,89 @@ def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, f
 				printlist = [str(x) for x in [query_name, subject_name, aai, stdev_aai, match_count, match_prop]]
 				final_results_tsv_handle.write('\t'.join(printlist) + '\n')
 		final_results_tsv_handle.close()
-		
+
 	except Exception as e:
 		sys.stderr.write('Problem with processing self-BLASTp results to determine pairwise AAIs.\n')
 		logObject.error('Problem with processing self-BLASTp results to determine pairwise AAIs.')
 		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
+
+def processOrthogroupsTsvForHammingDistance(og_file, logObject):
+	try:
+		sample_og_presence = defaultdict(list)
+		samples = []
+		ogs = []
+		with open(og_file) as oof:
+			for i, line in enumerate(oof):
+				line = line.strip('\n')
+				ls = line.split('\t')
+				if i == 0: 
+					samples = ls[1:]
+				else:
+					og = ls[0]
+					ogs.append(og)
+					for j, val in enumerate(ls[1:]):
+						sample = samples[j]
+						if val.strip() != '':
+							sample_og_presence[sample].append(1)
+						else:
+							sample_og_presence[sample].append(0)
+		
+		hd_mat = []
+		og_mat = []
+		for s1 in samples:
+			row = []
+			og_mat.append(sample_og_presence[s1])
+			for s2 in samples:
+				hd = distance.hamming(sample_og_presence[s1], sample_og_presence[s2])
+				row.append(hd)
+			hd_mat.append(row)
+		return ([hd_mat, og_mat, samples, ogs])
+	except Exception as e:
+		sys.stderr.write('Problem determining Hamming-distance between samples based on Orthogroups.tsv file.\n')
+		logObject.error('Problem determining Hamming-distance between samples based on Orthogroups.tsv file.')
+		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
+
+def createNJTree(tree_file, hd_mat, ids, logObject):
+	try:
+		dm = DistanceMatrix(hd_mat, ids)
+		newick_str = nj(dm, result_constructor=str)
+		tree_handle = open(tree_file, 'w')
+		tree_handle.write(newick_str + '\n')
+		tree_handle.close()
+	except Exception as e:
+		sys.stderr.write('Problem constructing neighbor-joining tree.\n')
+		logObject.error('Problem  constructing neighbor-joining tree.')
+		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
+
+def performPCA(outdir, og_mat, ids, og_ids, logObject, n_components=3):
+	"""
+	Function for performing PCA - following guide: 
+	https://builtin.com/machine-learning/pca-in-python
+	and 
+	https://plotly.com/python/pca-visualization/
+	"""
+	try:
+		pddf = pd.DataFrame(og_mat, columns=og_ids, index=ids)
+		pca = PCA(n_components=n_components)
+		components = pca.fit_transform(pddf)
+
+		total_var = pca.explained_variance_ratio_.sum() * 100
+
+		labels = {str(i): f"PC {i+1}" for i in range(n_components)}
+		labels['color'] = 'Median Price'
+
+		fig = px.scatter_matrix(
+			components,
+			dimensions=range(n_components),
+			title=f'Total Explained Variance: {total_var:.2f}%',)
+		fig.update_traces(diagonal_visible=False)
+		fig.write_html(outdir + "Plotly_PCA.html")
+
+	except Exception as e:
+		sys.stderr.write('Problems with performing PCA.\n')
+		logObject.error('Problem with performing PCA.')
+		sys.stderr.write(traceback.format_exc())
+		sys.exit(1)
