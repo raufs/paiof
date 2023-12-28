@@ -157,8 +157,9 @@ def paiof():
 	# step 3: process and compute AAI and Shared Orthologs
 	check_file_step3 = check_dir + 'step3.txt'
 	final_result_tsv = outdir + 'Pairwise_AAI_Estimates.tsv'
+	full_rbh_listing_tsv = outdir + 'Full_RBH_Listings.tsv'
 	if not os.path.isfile(check_file_step3):
-		util.calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_result_tsv, logObject)
+		util.calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_result_tsv, full_rbh_listing_tsv, logObject)
 		os.system('touch %s' % check_file_step3)
 
 	# close logging object and exit

@@ -94,7 +94,7 @@ def setupDIAMONDdbs(og_seq_dir, diamond_db_dir, ogs_to_consider, logObject, cpus
 		build_db_cmds = []
 		for f in os.listdir(og_seq_dir):
 			if f.endswith('.fa'): 
-				og = '.fa'.join(f.endswith('.fa')[:-1])
+				og = '.fa'.join(f.split('.fa')[:-1])
 				if not og in ogs_to_consider: continue
 				og_seq = og_seq_dir + f
 				diamond_db = diamond_db_dir + f + '.dmnd'
@@ -117,7 +117,7 @@ def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, ogs_to_consider, log
 		blastp_cmds = []
 		for f in os.listdir(og_seq_dir):
 			if f.endswith('.fa'): 
-				og = '.fa'.join(f.endswith('.fa')[:-1])
+				og = '.fa'.join(f.split('.fa')[:-1])
 				if not og in ogs_to_consider: continue
 				og_seq = og_seq_dir + f
 				diamond_db = diamond_db_dir + f + '.dmnd'
@@ -136,7 +136,7 @@ def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, ogs_to_consider, log
 		sys.stderr.write(traceback.format_exc())
 		sys.exit(1)
 
-def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_results_tsv, logObject):
+def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_results_tsv, full_rbh_results_tsv, logObject):
 	"""
 	Function to run self-blast.
 	"""
@@ -162,6 +162,7 @@ def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, f
 				genome_gene_counts[sid] += 1
 
 		genome_to_genome_aais = defaultdict(lambda: defaultdict(list))
+		query_gene_sample_gene_mapping = defaultdict(lambda: defaultdict(dict))
 		for f in os.listdir(blast_results_dir):
 			blast_results_file = blast_results_dir + f
 
@@ -174,21 +175,31 @@ def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, f
 					subject_sample = sequence_name_to_species_id[subject]
 					results.append([query, subject, query_sample, subject_sample, float(bitscore), float(pident)])
 			
-			# The AAI is currently computed by taking the percent identity to the best match of a gene 
-			# from sample/genome A to a gene in genome B belonging to the same ortholog group. This 
-			# doesn't necessary indicate the two genes are RBHs. Best hit is determined based on bitscore.
+			best_hit_for_query_gene_in_sample = defaultdict(lambda: defaultdict(lambda: [set([]), 0.0])) 
+			for hit in sorted(results, key=itemgetter(4), reverse=True):
+				qgene, sgene, q, s, bs, pid = hit
+				if bs > best_hit_for_query_gene_in_sample[qgene][s][1]:
+					best_hit_for_query_gene_in_sample[qgene][s] = [set([sgene]), bs]
+				elif bs == best_hit_for_query_gene_in_sample[qgene][s][1]:
+					best_hit_for_query_gene_in_sample[qgene][s][0].add(sgene)
+			
 			query_samples_already_matched = defaultdict(set)
 			query_sample_genes_already_matched = defaultdict(set)
 			for hit in sorted(results, key=itemgetter(4), reverse=True):
 				qgene, sgene, q, s, _, pid = hit
+				if not qgene in best_hit_for_query_gene_in_sample[sgene][q][0]: continue
+				if not sgene in best_hit_for_query_gene_in_sample[qgene][s][0]: continue
 				if s in query_samples_already_matched[qgene]: continue
 				if sgene in query_sample_genes_already_matched[q]: continue
 				genome_to_genome_aais[q][s].append(pid)
 				query_samples_already_matched[qgene].add(s)
 				query_sample_genes_already_matched[q].add(sgene)
+				query_gene_sample_gene_mapping[q][s][qgene] = [sgene, pid]
 
 		final_results_tsv_handle = open(final_results_tsv, 'w')
+		full_rbh_tsv_handle = open(full_rbh_results_tsv, 'w')
 		final_results_tsv_handle.write('\t'.join(['Genome_1', 'Genome_2', 'AAI', 'Stdev_AAI', 'Genes_Shared', 'Genes_Shared_Normalized_by_Genome_1_Genes']) + '\n')
+		full_rbh_tsv_handle.write('\t'.join(['Genome_1', 'Genome_2', 'Gene_1', 'Gene_2', 'Percent_Identity']) + '\n')
 		for q in genome_to_genome_aais:
 			query_name = species_id_to_name[q]
 			query_genome_gene_count = genome_gene_counts[q]
@@ -202,7 +213,11 @@ def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, f
 				stdev_aai = statistics.stdev(matches)
 				printlist = [str(x) for x in [query_name, subject_name, aai, stdev_aai, match_count, match_prop]]
 				final_results_tsv_handle.write('\t'.join(printlist) + '\n')
+				for qg in query_gene_sample_gene_mapping[q][s]:
+					printlist2 = [str(x) for x in [query_name, subject_name, qg, query_gene_sample_gene_mapping[q][s][qg][0], query_gene_sample_gene_mapping[q][s][qg][1]]]
+					full_rbh_tsv_handle.write('\t'.join(printlist2) + '\n')
 		final_results_tsv_handle.close()
+		full_rbh_tsv_handle.close()
 
 	except Exception as e:
 		sys.stderr.write('Problem with processing self-BLASTp results to determine pairwise AAIs.\n')
