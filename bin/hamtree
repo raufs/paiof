@@ -60,13 +60,13 @@ def create_parser():
 	parser.add_argument('-i', '--orthofinder_results_dir', help='Directory with results from OrthoFinder (Note, this usually starts with Results_DATE/).', required=True)
 	parser.add_argument('-o', '--output_directory', help='Output directory.', required=True)
 	parser.add_argument('-p', '--perform_pca', action='store_true', help="Also perform PCA analysis based on orthogroup presence/absence.")
-	parser.add_argument('-v', '--version', action='store_true', help="Report version of skDER.", required=False, default=False)
+	parser.add_argument('-v', '--version', action='store_true', help="Report version of paiof/hamtree.", required=False, default=False)
 	args = parser.parse_args()
 	return args
 
 def hamtree():
 	if len(sys.argv)>1 and ('-v' in set(sys.argv) or '--version' in set(sys.argv)):
-		sys.stderr.write('Version of paiof being used is: ' + str(version) + '\n')
+		sys.stderr.write('Version of paiof/hamtree being used is: ' + str(version) + '\n')
 		sys.exit(0)
 	
 	# Parse arguments
