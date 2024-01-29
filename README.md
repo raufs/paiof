@@ -47,7 +47,7 @@ options:
   -c CPUS, --cpus CPUS  Number of CPUs to use [Default is 1].
   -scc, --single_copy_core
                         Only use single-copy-core orthogroups.
-  -v, --version         Report version of skDER.
+  -v, --version         Report version of paoif/hamtree.
 ```
 
 ### hamtree
@@ -59,8 +59,6 @@ usage: hamtree [-h] -i ORTHOFINDER_RESULTS_DIR -o OUTPUT_DIRECTORY [-p] [-v]
         Author: Rauf Salamzade
         Affiliation: Kalan Lab, UW Madison, Department of Medical Microbiology and Immunology
 
-
-
 options:
   -h, --help            show this help message and exit
   -i ORTHOFINDER_RESULTS_DIR, --orthofinder_results_dir ORTHOFINDER_RESULTS_DIR
@@ -68,7 +66,7 @@ options:
   -o OUTPUT_DIRECTORY, --output_directory OUTPUT_DIRECTORY
                         Output directory.
   -p, --perform_pca     Also perform PCA analysis based on orthogroup presence/absence.
-  -v, --version         Report version of skDER.
+  -v, --version         Report version of paoif/hamtree.
 ```
 
 ### Citation
