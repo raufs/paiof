@@ -64,13 +64,13 @@ def create_parser():
 	parser.add_argument('-o', '--output_directory', help='Output directory.', required=True)
 	parser.add_argument('-c', '--cpus', type=int, help="Number of CPUs to use [Default is 1].", required=False, default=1)
 	parser.add_argument('-scc', '--single_copy_core', action='store_true', help="Only use single-copy-core orthogroups.", required=False, default=False)
-	parser.add_argument('-v', '--version', action='store_true', help="Report version of skDER.", required=False, default=False)
+	parser.add_argument('-v', '--version', action='store_true', help="Report version of paiof/hamtree.", required=False, default=False)
 	args = parser.parse_args()
 	return args
 
 def paiof():
 	if len(sys.argv)>1 and ('-v' in set(sys.argv) or '--version' in set(sys.argv)):
-		sys.stderr.write('Version of paiof being used is: ' + str(version) + '\n')
+		sys.stderr.write('Version of paiof/hamtree being used is: ' + str(version) + '\n')
 		sys.exit(0)
 	
 	# Parse arguments
