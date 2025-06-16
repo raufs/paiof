@@ -74,4 +74,3 @@ options:
 If you find paiof useful for your research, please cite:
 
 * OrthoFinder: phylogenetic orthology inference for comparative genomics. Emms and Kelly, _Genome Biology_ 2016.
-* Ancestral expansions in biosynthetic traits for both bacteria and fungi are linked to developments of multicellularity. Salamzade, Kalan, and Currie, 2025.
