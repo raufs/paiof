@@ -138,7 +138,7 @@ def blastOGs(og_seq_dir, diamond_db_dir, blast_results_dir, ogs_to_consider, log
 
 def calculatePairwiseAAI(blast_results_dir, species_id_file, sequence_id_file, final_results_tsv, full_rbh_results_tsv, logObject):
 	"""
-	Function to run self-blast.
+	Function to process DIAMOND blasting results and infer pairwise AAI. 
 	"""
 	try:
 		species_id_to_name = {}
