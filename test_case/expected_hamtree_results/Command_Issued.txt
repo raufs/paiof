@@ -1,0 +1,1 @@
+/workspace/local/rauf/paiof_env_for_mc/bin/hamtree -i orthofinder_results/Results_Aug03/ -o expected_hamtree_results/

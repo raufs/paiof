@@ -7,7 +7,7 @@ dependencies:
   - "python=3.10"
   - setuptools
   - pip
-  - bioconda::diamond=2.0.15
+  - bioconda::diamond
   - conda-forge::scikit-bio
   - scikit-learn
   - scipy

@@ -1,0 +1,1 @@
+/home/salamzade/Multicellularity_and_BGC_Abundances/develop_paiof/conda_env/bin/hamtree -i Results_Sep10/ -o Hamtree_Results/ -p

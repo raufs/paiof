@@ -1,0 +1,1 @@
+/home/salamzade/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env/bin/paiof -i OrthoFinder_Results/Results_Sep10/ -o paiof_Results/ -c 40
