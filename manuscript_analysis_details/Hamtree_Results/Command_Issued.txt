@@ -1,1 +1,1 @@
-/home/salamzade/Multicellularity_and_BGC_Abundances/develop_paiof/conda_env/bin/hamtree -i Results_Sep10/ -o Hamtree_Results/ -p
+/workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env_recreate_after_move/bin/hamtree -i /workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Actino/OrthoFinder_Analysis/OrthoFinder_Results/Results_Sep10/ -o Hamtree_Results/ -p

@@ -2,7 +2,7 @@
 
 To reproduce results from hamtree's usage in the manuscript, please first run OrthoFinder (v2.5.4) on the input set of 133 Actinomycetota proteomes (after gunzip-ing them). Details on the OrthoFinder conda environment can be found in this current directory: `conda_env_with_orthofinder.yaml`. 
 
-Afterwards, you would just run hamtree (v1.0.0) using an environment similar/identical to the one described in `paiof_conda_env.yaml`:
+Afterwards, you would just run hamtree (v1.0.2) using an environment similar/identical to the one described in `paiof_conda_env.yaml`:
 
 ```
 hamtree -i OrthoFinder_Results/Results_<MonthDay>/ -o Hamtree_Results/ -p
