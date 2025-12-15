@@ -1,4 +1,4 @@
-name: /workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env
+name: /workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env_recreate_after_move
 channels:
   - bioconda
   - conda-forge
@@ -143,5 +143,5 @@ dependencies:
   - zlib=1.2.13=hd590300_5
   - zstd=1.5.5=hfc55251_0
   - pip:
-      - paiof==1.0.0
-prefix: /workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env
+      - paiof==1.0.2
+prefix: /workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env_recreate_after_move

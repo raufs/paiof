@@ -1,0 +1,1 @@
+/workspace/lab/kalanlab/salamzar/multicellularity_and_bgcs/calcaneus/Multicellularity_and_BGC_Abundances/Software_Dev/develop_paiof/conda_env_recreate_after_move/bin/paiof -i OrthoFinder_Results_Mini/Results_Nov24/ -o paiof_Results/ -c 50
